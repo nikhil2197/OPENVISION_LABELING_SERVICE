@@ -17,35 +17,12 @@ const sessionVideos = new Map();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// CORS middleware with preflight handling
+// CORS middleware - allow all origins for now
 app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    const allowedOrigins = process.env.NODE_ENV === 'production' 
-      ? ['https://openvision-labeling-service-fronten.vercel.app', 'https://*.vercel.app'] 
-      : ['http://localhost:3000'];
-    
-    // Check if origin is allowed
-    const isAllowed = allowedOrigins.some(allowedOrigin => {
-      if (allowedOrigin.includes('*')) {
-        return origin.includes(allowedOrigin.replace('*', ''));
-      }
-      return origin === allowedOrigin;
-    });
-    
-    if (isAllowed) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: true, // Allow all origins
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'X-Session-Id', 'Authorization', 'Range'],
-  preflightContinue: false,
-  optionsSuccessStatus: 204
+  allowedHeaders: ['Content-Type', 'X-Session-Id', 'Authorization', 'Range']
 }));
 
 app.use(express.json({ limit: '10mb' }));
@@ -82,12 +59,6 @@ app.get('/api/health', (req, res) => {
 
 // File upload endpoint
 app.post('/api/upload', upload.single('video'), async (req, res) => {
-  // Set CORS headers explicitly as backup
-  res.setHeader('Access-Control-Allow-Origin', 'https://openvision-labeling-service-fronten.vercel.app');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Session-Id, Authorization, Range');
-  
   try {
     console.log(`[${new Date().toISOString()}] Upload request received:`, {
       hasFile: !!req.file,
