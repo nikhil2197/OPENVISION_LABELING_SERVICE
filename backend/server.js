@@ -20,7 +20,7 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://openvision-labeling-service-frontend.vercel.app', 'https://*.vercel.app'] 
+    ? ['https://openvision-labeling-service-fronten.vercel.app', 'https://*.vercel.app'] 
     : ['http://localhost:3000'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -30,7 +30,7 @@ app.use(cors({
 // Global OPTIONS handler for all endpoints
 app.options('*', (req, res) => {
   const origin = process.env.NODE_ENV === 'production' 
-    ? 'https://openvision-labeling-service-frontend.vercel.app'
+    ? 'https://openvision-labeling-service-fronten.vercel.app'
     : 'http://localhost:3000';
   
   res.setHeader('Access-Control-Allow-Origin', origin);
