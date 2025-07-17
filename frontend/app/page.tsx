@@ -27,7 +27,7 @@ export default function Home() {
   useEffect(() => {
     return () => {
       // Cleanup session videos when component unmounts
-      fetch(`/api/cleanup-session/${sessionId}`, { method: 'DELETE' }).catch(console.error);
+      fetch(`https://openvision-labeling-service.onrender.com/api/cleanup-session/${sessionId}`, { method: 'DELETE' }).catch(console.error);
     };
   }, [sessionId]);
 
@@ -64,7 +64,7 @@ export default function Home() {
       const formData = new FormData();
       formData.append('video', file);
 
-      const response = await fetch('/api/upload', {
+      const response = await fetch('https://openvision-labeling-service.onrender.com/api/upload', {
         method: 'POST',
         headers: {
           'X-Session-Id': sessionId,
@@ -79,7 +79,7 @@ export default function Home() {
 
       const data = await response.json();
       setUploadedVideo(data);
-      setDirectVideoUrl(`/api/uploaded-video/${data.videoId}`);
+      setDirectVideoUrl(`https://openvision-labeling-service.onrender.com/api/uploaded-video/${data.videoId}`);
       console.log('Video uploaded successfully:', data);
 
     } catch (err) {

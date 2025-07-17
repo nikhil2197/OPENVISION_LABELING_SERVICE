@@ -1,8 +1,12 @@
 {
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "https://openvision-labeling-service.onrender.com/api/:path*"
+      "source": "/api/snip",
+      "destination": "https://openvision-labeling-service.onrender.com/api/snip"
+    },
+    {
+      "source": "/api/cleanup-session/:sessionId",
+      "destination": "https://openvision-labeling-service.onrender.com/api/cleanup-session/:sessionId"
     }
   ],
   "env": {
