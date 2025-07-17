@@ -1,13 +1,13 @@
 # 🎬 Video Labeling Service
 
-A lightweight tool for creating 60-second video clips from Google Drive videos. Users can watch a video, click "Mark Event" at any moment, and receive a downloadable clip ending at that timestamp.
+A lightweight tool for creating 60-second video clips from uploaded videos. Users can upload videos up to 2GB, watch them in the player, click "Mark Event" at any moment, and receive a downloadable clip ending at that timestamp.
 
 ## 🏗️ Architecture
 
 - **Frontend**: Next.js (deployed on Vercel)
 - **Backend**: Node.js + Express (deployed on Render)
 - **Video Processing**: FFmpeg for clipping and streaming
-- **Storage**: None - clips are streamed directly, no persistent storage
+- **Storage**: Session-only memory storage for uploaded videos (no persistent storage)
 
 ## 🚀 Quick Start
 
@@ -37,20 +37,49 @@ A lightweight tool for creating 60-second video clips from Google Drive videos. 
 
 3. **Test the application:**
    - Open http://localhost:3000
-   - Paste a Google Drive video link
+   - Upload a video file (up to 2GB)
    - Watch the video and click "Mark Event"
    - Download your 60-second clip!
 
 ## 🎯 How It Works
 
-1. **Input**: User provides a Google Drive video link
-2. **Conversion**: App converts shared links to direct download URLs
+1. **Upload**: Select a video file from your computer (up to 2GB)
+2. **Session Storage**: Video is stored in server memory (session-only, not persistent)
 3. **Playback**: Video plays in browser using ReactPlayer
 4. **Event Marking**: User clicks "Mark Event" at desired timestamp
-5. **Processing**: Backend downloads video, clips 60s ending at timestamp
+5. **Processing**: Backend processes the uploaded video, clips 60s ending at timestamp
 6. **Delivery**: 60-second clip streams directly to user's browser
 
 ## 🔧 API Endpoints
+
+### `POST /api/upload`
+
+Uploads a video file to session storage.
+
+**Request:**
+- `Content-Type: multipart/form-data`
+- `video`: Video file (up to 2GB)
+- `X-Session-Id`: Session identifier (optional, auto-generated if not provided)
+
+**Response:**
+```json
+{
+  "success": true,
+  "videoId": "uuid",
+  "sessionId": "session_uuid",
+  "originalName": "video.mp4",
+  "size": 1048576,
+  "message": "Video uploaded successfully"
+}
+```
+
+### `GET /api/uploaded-video/:videoId`
+
+Streams an uploaded video from session storage.
+
+**Response:**
+- `Content-Type: video/mp4` (or original mime type)
+- Video stream with range request support
 
 ### `POST /api/snip`
 
@@ -64,10 +93,30 @@ Creates a 60-second video clip ending at the specified timestamp.
 }
 ```
 
+OR for uploaded videos:
+```json
+{
+  "video_id": "uploaded_video_uuid",
+  "timestamp": 132.4
+}
+```
+
 **Response:**
 - `Content-Type: video/mp4`
 - `Content-Disposition: attachment; filename="clip_132s.mp4"`
 - Video stream (60 seconds from `timestamp - 60` to `timestamp`)
+
+### `DELETE /api/cleanup-session/:sessionId`
+
+Cleans up all videos for a specific session.
+
+**Response:**
+```json
+{
+  "success": true,
+  "cleanedCount": 1
+}
+```
 
 ### `GET /api/health`
 
@@ -124,6 +173,12 @@ Health check endpoint.
 
 ## 🧪 Testing
 
+### Test Video Files
+
+You can test with any video file up to 2GB:
+- MP4, AVI, MOV, MKV, etc.
+- The application will automatically convert to MP4 for the output clip
+
 ### Test Video Links
 
 Use these public Google Drive video links for testing:
@@ -133,16 +188,17 @@ Use these public Google Drive video links for testing:
 
 ### Manual Testing
 
-1. Paste a Google Drive video link
-2. Wait for video to load
-3. Seek to 60+ seconds
-4. Click "Mark Event"
-5. Verify 60-second clip downloads
+1. **Upload a video file:**
+   - Choose a video file from your computer
+   - Wait for upload to complete
+   - Seek to 60+ seconds
+   - Click "Mark Event"
+   - Verify 60-second clip downloads
 
 ## ⚠️ Known Limitations
 
-- **Google Drive**: Videos must be public and direct-downloadable
-- **Video Size**: Large videos may timeout during download
+- **Upload Size**: Maximum 2GB per video file
+- **Session Storage**: Uploaded videos are stored in memory only and lost when server restarts
 - **Format**: Currently optimized for MP4 files
 - **Duration**: Input videos should be longer than 60 seconds
 
@@ -150,15 +206,21 @@ Use these public Google Drive video links for testing:
 
 ### Common Issues
 
-1. **"Failed to download video"**
-   - Check if Google Drive link is public
-   - Verify direct download URL format
+1. **"File size too large"**
+   - Ensure video file is under 2GB
+   - Check server memory limits
 
-2. **"Video processing failed"**
+2. **"Failed to upload video"**
+   - Check file format (must be video)
+   - Verify server is running and accessible
+
+
+
+4. **"Video processing failed"**
    - Check backend logs for FFmpeg errors
    - Verify video format is supported
 
-3. **CORS errors**
+5. **CORS errors**
    - Ensure backend CORS is configured correctly
    - Check API proxy settings in Vercel
 
@@ -171,9 +233,19 @@ DEBUG=* npm run dev
 
 ## 📊 Performance
 
+- **Upload Time**: Depends on file size and network speed
 - **Processing Time**: ~30-60 seconds for typical videos
 - **Memory Usage**: Temporary files cleaned up automatically
-- **Concurrent Users**: Limited by Render's starter plan
+- **Session Storage**: Videos stored in memory, cleared on server restart
+- **Concurrent Users**: Limited by Render's starter plan and server memory
+
+## 🔒 Security & Privacy
+
+- **No Persistent Storage**: Uploaded videos are never saved to disk
+- **Session Isolation**: Each user session is isolated
+- **Automatic Cleanup**: Videos are automatically cleaned up when sessions end
+- **File Validation**: Only video files are accepted
+- **Size Limits**: 2GB maximum file size enforced
 
 ## 🤝 Contributing
 
