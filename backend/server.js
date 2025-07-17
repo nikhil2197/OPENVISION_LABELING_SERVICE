@@ -20,12 +20,26 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://openvision-labeling-service-fronten.vercel.app', 'https://*.vercel.app'] 
+    ? ['https://openvision-labeling-service-frontend.vercel.app', 'https://*.vercel.app'] 
     : ['http://localhost:3000'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'X-Session-Id', 'Authorization']
+  allowedHeaders: ['Content-Type', 'X-Session-Id', 'Authorization', 'Range']
 }));
+
+// Global OPTIONS handler for all endpoints
+app.options('*', (req, res) => {
+  const origin = process.env.NODE_ENV === 'production' 
+    ? 'https://openvision-labeling-service-frontend.vercel.app'
+    : 'http://localhost:3000';
+  
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Session-Id, Authorization, Range');
+  res.status(204).end();
+});
+
 app.use(express.json({ limit: '10mb' }));
 
 // Multer configuration for file uploads
@@ -56,23 +70,10 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// OPTIONS handler for upload endpoint
-app.options('/api/upload', (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', 'https://openvision-labeling-service-fronten.vercel.app');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Session-Id');
-  res.status(204).end();
-});
+
 
 // File upload endpoint
 app.post('/api/upload', upload.single('video'), async (req, res) => {
-  // Set CORS headers explicitly for this endpoint
-  res.setHeader('Access-Control-Allow-Origin', 'https://openvision-labeling-service-fronten.vercel.app');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Session-Id');
-  
   try {
     console.log(`[${new Date().toISOString()}] Upload request received:`, {
       hasFile: !!req.file,
