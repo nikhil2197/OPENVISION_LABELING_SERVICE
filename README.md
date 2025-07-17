@@ -144,6 +144,10 @@ Health check endpoint.
 
 4. **Deploy and note the URL** (e.g., `https://your-app.onrender.com`)
 
+5. **Environment Variables**:
+   - `GCS_BUCKET`: Your Google Cloud Storage bucket name.
+   - `GCS_SERVICE_KEY`: (Optional) Paste the JSON contents of your Google service account key as a secret value. If set, the server will use this for authentication. Otherwise, provide a `gcs-key.json` file in the backend directory.
+
 ### Frontend (Vercel)
 
 1. **Connect your repository to Vercel**
@@ -167,6 +171,8 @@ Health check endpoint.
 ### Backend
 - `PORT`: Server port (default: 3001)
 - `NODE_ENV`: Environment (production/development)
+- `GCS_BUCKET`: Google Cloud Storage bucket name (required).
+- `GCS_SERVICE_KEY`: (Optional) Service account JSON for GCS authentication. Provide the JSON string or a path to a mounted secret file. If not set, the server will load `gcs-key.json` from the backend directory.
 
 ### Frontend
 - `BACKEND_URL`: Backend API URL for production

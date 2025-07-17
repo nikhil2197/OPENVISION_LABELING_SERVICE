@@ -10,7 +10,39 @@ const multer = require('multer');
 
 // Google Cloud Storage setup for signed URL uploads
 const { Storage } = require('@google-cloud/storage');
-const storage = new Storage({ keyFilename: path.join(__dirname, 'gcs-key.json') });
+// Initialize Storage client with environment variable credentials or key file
+let storage;
+const keyFilePath = path.join(__dirname, 'gcs-key.json');
+if (process.env.GCS_SERVICE_KEY) {
+  // GCS_SERVICE_KEY can be a JSON string or a path to a secret file
+  let credentials;
+  try {
+    const raw = process.env.GCS_SERVICE_KEY.trim();
+    if (raw.startsWith('{')) {
+      credentials = JSON.parse(raw);
+    } else if (fs.existsSync(raw)) {
+      credentials = JSON.parse(fs.readFileSync(raw, 'utf8'));
+    } else {
+      throw new Error('GCS_SERVICE_KEY is not valid JSON or file path');
+    }
+  } catch (e) {
+    console.error('Error loading GCS_SERVICE_KEY:', e);
+    process.exit(1);
+  }
+  storage = new Storage({
+    credentials,
+    projectId: credentials.project_id,
+  });
+} else if (fs.existsSync(keyFilePath)) {
+  // Fallback to gcs-key.json file in backend directory
+  storage = new Storage({ keyFilename: keyFilePath });
+} else {
+  console.error(
+    'Error: No GCS credentials provided. Please set the GCS_SERVICE_KEY environment variable ' +
+    'with your service account JSON or deploy a gcs-key.json file in the backend directory.'
+  );
+  process.exit(1);
+}
 // Require GCS_BUCKET env var for your GCS bucket name
 const GCS_BUCKET = process.env.GCS_BUCKET;
 if (!GCS_BUCKET) {
