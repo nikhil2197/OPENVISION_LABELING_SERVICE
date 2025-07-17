@@ -7,6 +7,14 @@
     {
       "source": "/api/cleanup-session/:sessionId",
       "destination": "https://openvision-labeling-service.onrender.com/api/cleanup-session/:sessionId"
+    },
+    {
+      "source": "/api/upload-url",
+      "destination": "https://openvision-labeling-service.onrender.com/api/upload-url"
+    },
+    {
+      "source": "/api/download-url",
+      "destination": "https://openvision-labeling-service.onrender.com/api/download-url"
     }
   ],
   "env": {
