@@ -647,19 +647,40 @@ app.post('/api/snip', async (req, res) => {
     
     // Handle uploaded video or download from URL
     if (video_id) {
-      // Process uploaded video from session storage
-      const video = sessionVideos.get(video_id);
-      if (!video) {
-        throw new Error('Uploaded video not found in session');
+      // Process uploaded video from GCS storage
+      console.log(`[${new Date().toISOString()}] Processing GCS video:`, video_id);
+
+      try {
+        // Download video from GCS to temp file
+        const file = storage.bucket(GCS_BUCKET).file(video_id);
+        
+        // Check if file exists
+        const [exists] = await file.exists();
+        if (!exists) {
+          throw new Error('Video not found in GCS storage');
+        }
+
+        // Download to temp file
+        await file.download({ destination: inputPath });
+        console.log(`[${new Date().toISOString()}] Downloaded video from GCS:`, video_id);
+        
+      } catch (gcsError) {
+        console.error(`[${new Date().toISOString()}] GCS download error:`, gcsError);
+        
+        // Fallback: try session storage (for backward compatibility)
+        const video = sessionVideos.get(video_id);
+        if (!video) {
+          throw new Error('Video not found in GCS storage or session');
+        }
+
+        console.log(`[${new Date().toISOString()}] Processing uploaded video from session:`, {
+          originalName: video.originalName,
+          size: video.size
+        });
+
+        // Write uploaded video buffer to temp file
+        await fs.writeFile(inputPath, video.buffer);
       }
-
-      console.log(`[${new Date().toISOString()}] Processing uploaded video:`, {
-        originalName: video.originalName,
-        size: video.size
-      });
-
-      // Write uploaded video buffer to temp file
-      await fs.writeFile(inputPath, video.buffer);
       
     } else {
       // Download video from URL to temp file
@@ -758,6 +779,10 @@ app.post('/api/snip', async (req, res) => {
     if (!res.headersSent) {
       if (error.message === 'Uploaded video not found in session') {
         res.status(400).json({ error: 'Video not found in session. Please upload a video first.' });
+      } else if (error.message === 'Video not found in GCS storage') {
+        res.status(400).json({ error: 'Video not found in storage. Please upload a video first.' });
+      } else if (error.message === 'Video not found in GCS storage or session') {
+        res.status(400).json({ error: 'Video not found. Please upload a video first.' });
       } else if (error.response) {
         res.status(500).json({ 
           error: `Failed to download video: ${error.response.status} ${error.response.statusText}` 
