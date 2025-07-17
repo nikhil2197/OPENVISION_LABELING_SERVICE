@@ -16,7 +16,8 @@
     "fluent-ffmpeg": "^2.1.2",
     "uuid": "^9.0.1",
     "fs-extra": "^11.1.1",
-    "multer": "^2.0.0-rc.2"
+    "multer": "^2.0.0-rc.2",
+    "@google-cloud/storage": "^7.16.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"

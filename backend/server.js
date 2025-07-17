@@ -8,6 +8,11 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
 
+// Google Cloud Storage setup for signed URL uploads
+const { Storage } = require('@google-cloud/storage');
+const storage = new Storage({ keyFilename: path.join(__dirname, 'gcs-key.json') });
+const GCS_BUCKET = process.env.GCS_BUCKET || 'my-video-uploads-yourproject';
+
 // Set ffmpeg path
 ffmpeg.setFfmpegPath(ffmpegStatic);
 
@@ -36,6 +41,7 @@ const upload = multer({
     files: 1
   },
   fileFilter: (req, file, cb) => {
+    console.log(`[${new Date().toISOString()}] Processing file:`, file.originalname, file.mimetype);
     // Accept video files only
     if (file.mimetype.startsWith('video/')) {
       cb(null, true);
@@ -59,6 +65,8 @@ app.get('/api/health', (req, res) => {
 
 // File upload endpoint
 app.post('/api/upload', upload.single('video'), async (req, res) => {
+  console.log(`[${new Date().toISOString()}] Upload endpoint hit`);
+  
   try {
     console.log(`[${new Date().toISOString()}] Upload request received:`, {
       hasFile: !!req.file,
@@ -110,9 +118,11 @@ app.post('/api/upload', upload.single('video'), async (req, res) => {
 
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Upload error:`, error);
-    res.status(500).json({ 
-      error: error.message || 'Failed to upload video' 
-    });
+    if (!res.headersSent) {
+      res.status(500).json({ 
+        error: error.message || 'Failed to upload video' 
+      });
+    }
   }
 });
 
@@ -774,6 +784,47 @@ process.on('SIGINT', async () => {
 process.on('SIGTERM', async () => {
   await cleanup();
   process.exit(0);
+});
+
+// Signed URL endpoint for direct uploads to GCS
+app.post('/api/upload-url', async (req, res) => {
+  const { filename, contentType } = req.body;
+  if (!filename || !contentType) {
+    return res.status(400).json({ error: 'filename & contentType required' });
+  }
+  try {
+    const file = storage.bucket(GCS_BUCKET).file(filename);
+    const [uploadUrl] = await file.getSignedUrl({
+      version: 'v4',
+      action: 'write',
+      expires: Date.now() + 30 * 60 * 1000, // 30 minutes
+      contentType,
+    });
+    res.json({ uploadUrl });
+  } catch (error) {
+    console.error('Error generating upload URL:', error);
+    res.status(500).json({ error: 'Failed to generate upload URL' });
+  }
+});
+
+// Signed URL endpoint for direct downloads from GCS (optional)
+app.get('/api/download-url', async (req, res) => {
+  const { filename } = req.query;
+  if (!filename) {
+    return res.status(400).json({ error: 'filename required' });
+  }
+  try {
+    const file = storage.bucket(GCS_BUCKET).file(filename);
+    const [downloadUrl] = await file.getSignedUrl({
+      version: 'v4',
+      action: 'read',
+      expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+    });
+    res.json({ downloadUrl });
+  } catch (error) {
+    console.error('Error generating download URL:', error);
+    res.status(500).json({ error: 'Failed to generate download URL' });
+  }
 });
 
 // Error handling middleware

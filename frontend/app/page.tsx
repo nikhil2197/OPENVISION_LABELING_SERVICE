@@ -24,10 +24,10 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Cleanup session on component unmount
+  // Cleanup session on component unmount (clears any server-side session videos if used)
   useEffect(() => {
     return () => {
-      // Cleanup session videos when component unmounts
-      fetch(`https://openvision-labeling-service.onrender.com/api/cleanup-session/${sessionId}`, { method: 'DELETE' }).catch(console.error);
+      fetch(`/api/cleanup-session/${sessionId}`, { method: 'DELETE' }).catch(console.error);
     };
   }, [sessionId]);
 
@@ -38,7 +38,7 @@ export default function Home() {
 
 
 
-  // Handle file upload
+  // Handle file upload via GCS signed URLs
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -61,29 +61,39 @@ export default function Home() {
     setDirectVideoUrl('');
 
     try {
-      const formData = new FormData();
-      formData.append('video', file);
-
-      const response = await fetch('https://openvision-labeling-service.onrender.com/api/upload', {
+      // 1) Request signed PUT URL
+      const uploadRes = await fetch('/api/upload-url', {
         method: 'POST',
-        headers: {
-          'X-Session-Id': sessionId,
-        },
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, contentType: file.type }),
       });
+      if (!uploadRes.ok) throw new Error('Failed to get upload URL');
+      const { uploadUrl } = await uploadRes.json();
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Upload failed');
-      }
+      // 2) Upload to GCS
+      const putRes = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type },
+        body: file,
+      });
+      if (!putRes.ok) throw new Error('Upload to storage failed');
 
-      const data = await response.json();
-      setUploadedVideo(data);
-      setDirectVideoUrl(`https://openvision-labeling-service.onrender.com/api/uploaded-video/${data.videoId}`);
-      console.log('Video uploaded successfully:', data);
+      // Record uploaded video info
+      const uploaded: UploadedVideo = {
+        videoId: file.name,
+        sessionId,
+        originalName: file.name,
+        size: file.size,
+      };
+      setUploadedVideo(uploaded);
 
+      // 3) Request signed GET URL
+      const downloadRes = await fetch(`/api/download-url?filename=${encodeURIComponent(file.name)}`);
+      if (!downloadRes.ok) throw new Error('Failed to get download URL');
+      const { downloadUrl } = await downloadRes.json();
+      setDirectVideoUrl(downloadUrl);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to upload video');
+      setError(err instanceof Error ? err.message : 'Upload failed');
       console.error('Upload error:', err);
     } finally {
       setIsUploading(false);

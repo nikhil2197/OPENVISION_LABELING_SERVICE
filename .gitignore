@@ -103,4 +103,5 @@ Thumbs.db
 *.mkv
 
 # Render specific
-.render-buildlogs/ 
+.render-buildlogs/ gcs-key.json
+backend/gcs-key.json
