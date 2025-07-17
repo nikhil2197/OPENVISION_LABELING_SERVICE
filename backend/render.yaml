@@ -8,4 +8,6 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: GCS_BUCKET
+        value: openvision_labelling_service
     healthCheckPath: /api/health 

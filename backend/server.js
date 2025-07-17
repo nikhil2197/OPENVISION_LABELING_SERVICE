@@ -11,7 +11,13 @@ const multer = require('multer');
 // Google Cloud Storage setup for signed URL uploads
 const { Storage } = require('@google-cloud/storage');
 const storage = new Storage({ keyFilename: path.join(__dirname, 'gcs-key.json') });
-const GCS_BUCKET = process.env.GCS_BUCKET || 'my-video-uploads-yourproject';
+// Require GCS_BUCKET env var for your GCS bucket name
+const GCS_BUCKET = process.env.GCS_BUCKET;
+if (!GCS_BUCKET) {
+  console.error('Error: GCS_BUCKET environment variable is not set.\n' +
+    'Please set GCS_BUCKET to your Google Cloud Storage bucket name.');
+  process.exit(1);
+}
 
 // Set ffmpeg path
 ffmpeg.setFfmpegPath(ffmpegStatic);
@@ -803,7 +809,7 @@ app.post('/api/upload-url', async (req, res) => {
     res.json({ uploadUrl });
   } catch (error) {
     console.error('Error generating upload URL:', error);
-    res.status(500).json({ error: 'Failed to generate upload URL' });
+    return res.status(500).json({ error: error.message || 'Failed to generate upload URL' });
   }
 });
 
