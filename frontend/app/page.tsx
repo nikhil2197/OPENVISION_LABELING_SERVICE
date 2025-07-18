@@ -19,9 +19,13 @@ export default function Home() {
   const [isVideoLoading, setIsVideoLoading] = useState(false);
   const [uploadedVideo, setUploadedVideo] = useState<UploadedVideo | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStage, setUploadStage] = useState<'idle' | 'getting-url' | 'uploading' | 'getting-download-url'>('idle');
+  const [currentUploadFile, setCurrentUploadFile] = useState<{name: string, size: number, sizeFormatted: string} | null>(null);
   const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
   const playerRef = useRef<ReactPlayer>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadXHRRef = useRef<XMLHttpRequest | null>(null);
 
   // Cleanup session on component unmount
   // Cleanup session on component unmount (clears any server-side session videos if used)
@@ -36,9 +40,7 @@ export default function Home() {
     setIsVideoLoading(false);
   }, [directVideoUrl]);
 
-
-
-  // Handle file upload via GCS signed URLs
+  // Handle file upload via GCS signed URLs with progress tracking
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -56,9 +58,16 @@ export default function Home() {
     }
 
     setIsUploading(true);
+    setUploadProgress(0);
+    setUploadStage('getting-url');
     setError('');
     setUploadedVideo(null);
     setDirectVideoUrl('');
+    setCurrentUploadFile({
+      name: file.name,
+      size: file.size,
+      sizeFormatted: formatFileSize(file.size)
+    });
 
     try {
       // 1) Request signed PUT URL
@@ -70,13 +79,41 @@ export default function Home() {
       if (!uploadRes.ok) throw new Error('Failed to get upload URL');
       const { uploadUrl } = await uploadRes.json();
 
-      // 2) Upload to GCS
-      const putRes = await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': file.type },
-        body: file,
+      // 2) Upload to GCS with progress tracking
+      setUploadStage('uploading');
+      setUploadProgress(0);
+      
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        uploadXHRRef.current = xhr;
+        
+        xhr.upload.addEventListener('progress', (event) => {
+          if (event.lengthComputable) {
+            const progress = (event.loaded / event.total) * 100;
+            setUploadProgress(progress);
+          }
+        });
+
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve();
+          } else {
+            reject(new Error(`Upload failed with status: ${xhr.status}`));
+          }
+        });
+
+        xhr.addEventListener('error', () => {
+          reject(new Error('Upload failed'));
+        });
+
+        xhr.addEventListener('abort', () => {
+          reject(new Error('Upload was aborted'));
+        });
+
+        xhr.open('PUT', uploadUrl);
+        xhr.setRequestHeader('Content-Type', file.type);
+        xhr.send(file);
       });
-      if (!putRes.ok) throw new Error('Upload to storage failed');
 
       // Record uploaded video info
       const uploaded: UploadedVideo = {
@@ -88,15 +125,29 @@ export default function Home() {
       setUploadedVideo(uploaded);
 
       // 3) Request signed GET URL
+      setUploadStage('getting-download-url');
+      setUploadProgress(95); // Almost done
+      
       const downloadRes = await fetch(`/api/download-url?filename=${encodeURIComponent(file.name)}`);
       if (!downloadRes.ok) throw new Error('Failed to get download URL');
       const { downloadUrl } = await downloadRes.json();
       setDirectVideoUrl(downloadUrl);
+      
+      setUploadProgress(100);
+      // Reset progress after a short delay
+      setTimeout(() => {
+        setUploadProgress(0);
+        setUploadStage('idle');
+        setCurrentUploadFile(null);
+      }, 1000);
+      
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
       console.error('Upload error:', err);
     } finally {
       setIsUploading(false);
+      setCurrentUploadFile(null);
+      uploadXHRRef.current = null;
     }
   };
 
@@ -220,6 +271,23 @@ export default function Home() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  const getUploadStageMessage = (stage: string, progress: number): string => {
+    switch (stage) {
+      case 'getting-url':
+        return 'Getting upload URL...';
+      case 'uploading':
+        if (progress === 0) return 'Starting upload...';
+        if (progress < 10) return 'Uploading to cloud storage...';
+        if (progress < 50) return 'Uploading video data...';
+        if (progress < 90) return 'Almost done uploading...';
+        return 'Finalizing upload...';
+      case 'getting-download-url':
+        return 'Preparing video for playback...';
+      default:
+        return 'Processing...';
+    }
+  };
+
   return (
     <main className="min-h-screen p-8 bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="max-w-4xl mx-auto">
@@ -258,6 +326,48 @@ export default function Home() {
               <p className="mt-2 text-sm text-gray-500">
                 Maximum file size: 2GB. Supported formats: MP4, AVI, MOV, etc.
               </p>
+              
+              {/* Upload Progress Bar */}
+              {isUploading && (
+                <div className="mt-4">
+                  {currentUploadFile && (
+                    <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                      <div className="text-sm font-medium text-blue-800">{currentUploadFile.name}</div>
+                      <div className="text-xs text-blue-600">{currentUploadFile.sizeFormatted}</div>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-700">
+                      {getUploadStageMessage(uploadStage, uploadProgress)}
+                    </span>
+                    <span className="text-sm text-gray-500">{Math.round(uploadProgress)}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+                      style={{ width: `${uploadProgress}%` }}
+                    ></div>
+                  </div>
+                  {uploadStage === 'uploading' && uploadProgress > 0 && (
+                    <div className="mt-2">
+                      <p className="text-xs text-gray-500 mb-2">
+                        Large video files may take several minutes to upload. Please don't close this page.
+                      </p>
+                      <button
+                        onClick={() => {
+                          if (uploadXHRRef.current) {
+                            uploadXHRRef.current.abort();
+                          }
+                        }}
+                        className="text-xs text-red-600 hover:text-red-800 underline"
+                      >
+                        Cancel upload
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+              
               {uploadedVideo && (
                 <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
                   <div className="flex items-center justify-between">

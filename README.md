@@ -17,6 +17,13 @@ A lightweight tool for creating 60-second video clips from uploaded videos. User
 - npm or yarn
 - FFmpeg (handled by ffmpeg-static in backend)
 
+### Features
+
+- **Real-time Upload Progress**: Visual progress bar with detailed status messages
+- **File Information Display**: Shows file name and size during upload
+- **Upload Cancellation**: Users can cancel uploads in progress
+- **Large File Support**: Optimized for videos up to 2GB with proper user feedback
+
 ### Local Development
 
 1. **Clone and install dependencies:**
@@ -44,6 +51,9 @@ A lightweight tool for creating 60-second video clips from uploaded videos. User
 ## 🎯 How It Works
 
 1. **Upload**: Select a video file from your computer (up to 2GB)
+   - Real-time progress bar shows upload status
+   - File information displayed during upload
+   - Cancel option available during upload
 2. **Session Storage**: Video is stored in server memory (session-only, not persistent)
 3. **Playback**: Video plays in browser using ReactPlayer
 4. **Event Marking**: User clicks "Mark Event" at desired timestamp
